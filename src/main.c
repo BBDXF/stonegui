@@ -25,6 +25,7 @@
 #include "quickjs-libc.h"
 
 #include "lv_bindings.h"
+#include "sg_theme.h"
 
 #define DISPLAY_WIDTH  800
 #define DISPLAY_HEIGHT 480
@@ -140,6 +141,9 @@ int main(int argc, char *argv[]) {
     }
     lv_display_set_default(disp);
     lv_sdl_window_set_resizeable(disp, true);
+
+    /* Install stonegui's default look & feel (Flutter/Material-like) */
+    sg_theme_init(disp, NULL);
 
     /* 3. Input devices */
     lv_indev_t *mouse = lv_sdl_mouse_create();

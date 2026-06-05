@@ -36,6 +36,7 @@ target_include_directories(lvgl PUBLIC ${CMAKE_SOURCE_DIR})
 add_executable(stonegui
     src/main.c
     src/lv_bindings.c
+    src/sg_theme.c
 )
 
 target_include_directories(stonegui PRIVATE

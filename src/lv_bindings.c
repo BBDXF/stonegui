@@ -14,6 +14,7 @@
  */
 
 #include "lv_bindings.h"
+#include "sg_theme.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -439,8 +440,8 @@ static JSValue js_loadFont(JSContext *ctx, JSValueConst this_val,
     return result;
 }
 
-/* setDefaultFont(handle) — make a loaded font the global default by re-applying
- * the default theme with it. All widgets that don't override `font` inherit it. */
+/* setDefaultFont(handle) — make a loaded font the global default while keeping
+ * stonegui's custom theme. All widgets that don't override `font` inherit it. */
 static JSValue js_setDefaultFont(JSContext *ctx, JSValueConst this_val,
                                   int argc, JSValueConst *argv) {
     (void)this_val;
@@ -448,14 +449,7 @@ static JSValue js_setDefaultFont(JSContext *ctx, JSValueConst this_val,
     int64_t h; JS_ToInt64(ctx, &h, argv[0]);
     if (!h) return JS_UNDEFINED;
 
-    lv_display_t *disp = lv_display_get_default();
-    lv_theme_t *th = lv_theme_default_init(
-        disp,
-        lv_palette_main(LV_PALETTE_BLUE),
-        lv_palette_main(LV_PALETTE_RED),
-        false,
-        (const lv_font_t *)(uintptr_t)h);
-    lv_display_set_theme(disp, th);
+    sg_theme_set_font(lv_display_get_default(), (const lv_font_t *)(uintptr_t)h);
     return JS_UNDEFINED;
 }
 

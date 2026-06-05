@@ -2,17 +2,20 @@
  * app.js — stonegui MVP demo
  *
  * Demonstrates:
- *  - View, Text, Button, Progress widgets
+ *  - View, Text, Button, Progress, Switch, Input widgets
  *  - Signals (reactive state)
- *  - Style props
- *  - Click events
+ *  - Fine-grained updates: reactive values are passed as accessor functions
+ *    (thunks), so a signal change updates a single LVGL property — the widget
+ *    is never destroyed/recreated.
+ *  - Style props and click events
  */
 
-import { h, render, createSignal, createEffect } from "../../js/framework.js";
+import { h, render, createSignal } from "../../js/framework.js";
 
 /* ── State ── */
-const [count, setCount] = createSignal(0);
+const [count, setCount]       = createSignal(0);
 const [progress, setProgress] = createSignal(20);
+const [on, setOn]             = createSignal(false);
 
 /* ── App component ── */
 function App() {
@@ -49,8 +52,9 @@ function App() {
             }
         },
             h("Text", {
-                style: { textColor: "#a6e3a1", width: 300, height: 50 },
-                text: `Count: ${count()}`,
+                style: { textColor: "#a6e3a1", width: 300, height: 50, fontSize: 20 },
+                /* reactive: updates lv_label_set_text only */
+                text: () => `Count: ${count()}`,
             }),
             h("Button", {
                 style: {
@@ -83,14 +87,14 @@ function App() {
             style: { flexFlow: "row", width: 740, height: 60 }
         },
             h("Text", {
-                style: { textColor: "#cba6f7", width: 220, height: 50 },
-                text: `Progress: ${progress()}%`,
+                style: { textColor: "#cba6f7", width: 220, height: 50, fontSize: 20 },
+                text: () => `Progress: ${progress()}%`,
             }),
             h("Progress", {
                 style: { width: 340, height: 24, borderRadius: 12 },
                 min: 0,
                 max: 100,
-                value: progress(),
+                value: () => progress(),
             }),
             h("View", { style: { width: 16 } }),
             h("Button", {
@@ -102,6 +106,23 @@ function App() {
                 },
                 text: "+10%",
                 onClick: () => setProgress(p => Math.min(100, p + 10)),
+            }),
+        ),
+
+        /* Spacer */
+        h("View", { style: { height: 20, width: 740 } }),
+
+        /* Switch row */
+        h("View", {
+            style: { flexFlow: "row", width: 740, height: 50 }
+        },
+            h("Text", {
+                style: { textColor: "#f9e2af", width: 220, height: 40, fontSize: 20 },
+                text: () => `Switch: ${on() ? "ON" : "OFF"}`,
+            }),
+            h("Switch", {
+                checked: () => on(),
+                onChange: () => setOn(v => !v),
             }),
         ),
 

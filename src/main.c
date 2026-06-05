@@ -106,6 +106,10 @@ int main(int argc, char *argv[]) {
     js_init_module_std(ctx, "std");
     js_init_module_os(ctx, "os");
 
+    /* ES module loader so relative imports ("../../js/framework.js") resolve */
+    JS_SetModuleLoaderFunc2(rt, NULL, js_module_loader,
+                            js_module_check_attributes, NULL);
+
     /* 5. Native LVGL module */
     lv_bindings_register(ctx);
 

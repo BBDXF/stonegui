@@ -1,11 +1,20 @@
 /**
- * framework.js — Minimal reactive UI framework for stonegui
+ * framework.js — Minimal fine-grained reactive UI framework for stonegui
  *
  * Provides:
- *   createSignal(init)         → [get, set]
- *   createEffect(fn)           → auto-tracks signals used inside fn
- *   h(type, props, ...children) → creates/updates LVGL nodes
- *   render(rootFn, container)  → mounts a component tree
+ *   createSignal(init)          → [get, set]
+ *   createEffect(fn)            → auto-tracks signals read inside fn
+ *   h(type, props, ...children) → builds a VNode tree
+ *   render(rootFn, container)   → mounts a component tree (once)
+ *
+ * Design (see doc/prompts.md — State Management):
+ *   The tree is built ONCE. Reactive values are passed as accessor functions
+ *   (thunks). Each reactive prop owns its own effect, so a signal change maps
+ *   to a single `lv.setProperty(...)` call — the widget is never destroyed and
+ *   recreated.
+ *
+ *     <Text text={() => `Count: ${count()}`} />
+ *        → lv_label_set_text(...)   // property update only
  */
 
 import * as lv from "lvgl";
@@ -42,9 +51,9 @@ export function createEffect(fn) {
     run();
 }
 
-/* ── Node pool ──────────────────────────────────────────────────────────── */
+/* ── VNode ──────────────────────────────────────────────────────────────── */
 
-/* A VNode describes one piece of UI */
+/* A VNode describes one piece of UI before it is mounted to a native node. */
 class VNode {
     constructor(type, props, children) {
         this.type     = type;      // "View" | "Text" | …
@@ -56,28 +65,39 @@ class VNode {
 
 /* ── Renderer ───────────────────────────────────────────────────────────── */
 
-function applyProps(native, props) {
-    if (!props) return;
+/**
+ * bindProp — apply a single property to a native node.
+ *
+ * If the value is a function it is treated as a reactive accessor: an effect is
+ * created so that only this property is re-applied when its signals change.
+ */
+function bindProp(native, key, value) {
+    if (typeof value === "function") {
+        createEffect(() => lv.setProperty(native, key, value()));
+    } else {
+        lv.setProperty(native, key, value);
+    }
+}
 
-    /* Flatten style object into top-level calls */
-    if (props.style) {
-        for (const [k, v] of Object.entries(props.style)) {
-            lv.setProperty(native, k, v);
+function applyProp(native, key, value) {
+    if (key === "children") return;
+
+    /* Style object: bind each entry (each may itself be reactive) */
+    if (key === "style") {
+        if (value) {
+            for (const [sk, sv] of Object.entries(value)) bindProp(native, sk, sv);
         }
+        return;
     }
 
-    for (const [k, v] of Object.entries(props)) {
-        if (k === "style" || k === "children") continue;
-
-        /* Event handlers: onClick → "click", onLongPress → "longpress" */
-        if (k.startsWith("on") && typeof v === "function") {
-            const eventName = k[2].toLowerCase() + k.slice(3).toLowerCase();
-            lv.addEvent(native, eventName, v);
-            continue;
-        }
-
-        lv.setProperty(native, k, v);
+    /* Event handlers: onClick → "click", onLongPress → "longpress" */
+    if (key.startsWith("on") && typeof value === "function") {
+        const eventName = key[2].toLowerCase() + key.slice(3).toLowerCase();
+        lv.addEvent(native, eventName, value);
+        return;
     }
+
+    bindProp(native, key, value);
 }
 
 function mountVNode(vnode, parentNative) {
@@ -87,16 +107,21 @@ function mountVNode(vnode, parentNative) {
     if (parentNative !== undefined)
         lv.appendChild(parentNative, native);
 
-    applyProps(native, vnode.props);
+    for (const [k, v] of Object.entries(vnode.props)) applyProp(native, k, v);
 
     for (const child of vnode.children) {
-        if (typeof child === "string") {
-            /* Treat bare string as text shorthand on the parent node */
-            lv.setProperty(native, "text", child);
-        } else if (child instanceof VNode) {
+        if (child instanceof VNode) {
             mountVNode(child, native);
+        } else if (typeof child === "function") {
+            /* Reactive text child */
+            createEffect(() => lv.setProperty(native, "text", String(child())));
+        } else if (child !== null && child !== undefined) {
+            /* Bare string/number → text shorthand on this node */
+            lv.setProperty(native, "text", String(child));
         }
     }
+
+    return native;
 }
 
 /* ── JSX factory ────────────────────────────────────────────────────────── */
@@ -107,37 +132,23 @@ export function h(type, props, ...children) {
     return new VNode(type, props, flat);
 }
 
-/* ── Reactive render ────────────────────────────────────────────────────── */
+/* ── Mount ──────────────────────────────────────────────────────────────── */
 
 /**
  * render(fn, containerNative?)
  *
- * fn is a zero-arg function that returns a VNode (the component tree).
- * Every time a signal read inside fn changes, the tree is rebuilt.
- *
- * For the MVP we do a simple full-remount on change.
- * (A production renderer would diff and patch.)
+ * fn is a zero-arg function returning a VNode (or array of VNodes). The tree is
+ * mounted ONCE; reactive props keep themselves up to date via fine-grained
+ * effects. There is no full-tree remount on signal changes.
  */
 export function render(fn, containerNative) {
     const root = containerNative !== undefined
         ? containerNative
         : lv.getScreen();
 
-    let prevNodes = [];
-
-    createEffect(() => {
-        const tree = fn();
-
-        /* Remove previous nodes */
-        for (const n of prevNodes) lv.dispose(n);
-        prevNodes = [];
-
-        const nodes = Array.isArray(tree) ? tree : [tree];
-        for (const vnode of nodes) {
-            if (vnode instanceof VNode) {
-                mountVNode(vnode, root);
-                prevNodes.push(vnode.native);
-            }
-        }
-    });
+    const tree  = fn();
+    const nodes = Array.isArray(tree) ? tree : [tree];
+    for (const vnode of nodes) {
+        if (vnode instanceof VNode) mountVNode(vnode, root);
+    }
 }

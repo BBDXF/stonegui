@@ -58,6 +58,14 @@ static void lv_event_dispatch(lv_event_t *e) {
     JS_FreeValue(ecb->ctx, ret);
 }
 
+/* Released when the owning widget is deleted — frees the JS handler + struct */
+static void lv_event_free(lv_event_t *e) {
+    EventCb *ecb = (EventCb *)lv_event_get_user_data(e);
+    if (!ecb) return;
+    JS_FreeValue(ecb->ctx, ecb->fn);
+    lv_free(ecb);
+}
+
 /* ── module functions ───────────────────────────────────────────────────── */
 
 static JSValue js_getScreen(JSContext *ctx, JSValueConst this_val,
@@ -204,8 +212,21 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
         lv_obj_set_style_text_color(obj, parse_color(v), 0);
         JS_FreeCString(ctx, v);
     } else if (strcmp(key, "fontSize") == 0) {
-        /* font size switching not trivially dynamic in LVGL; skip for MVP */
-        (void)0;
+        int32_t v; JS_ToInt32(ctx, &v, argv[2]);
+        /* Map to the nearest font compiled into lv_conf.h */
+        const lv_font_t *f = &lv_font_montserrat_14;
+        if      (v >= 24) f = &lv_font_montserrat_24;
+        else if (v >= 20) f = &lv_font_montserrat_20;
+        else if (v >= 16) f = &lv_font_montserrat_16;
+        lv_obj_set_style_text_font(obj, f, 0);
+    }
+    /* ── Image ── */
+    else if (strcmp(key, "src") == 0) {
+        const char *v = JS_ToCString(ctx, argv[2]);
+        const lv_obj_class_t *cls = lv_obj_get_class(obj);
+        if (cls == &lv_image_class && v)
+            lv_image_set_src(obj, v);
+        JS_FreeCString(ctx, v);
     }
     /* ── Progress / bar ── */
     else if (strcmp(key, "value") == 0) {
@@ -274,6 +295,8 @@ static JSValue js_addEvent(JSContext *ctx, JSValueConst this_val,
     ecb->fn  = JS_DupValue(ctx, argv[2]);
 
     lv_obj_add_event_cb(obj, lv_event_dispatch, code, ecb);
+    /* Free the JS handler + struct when the widget is destroyed */
+    lv_obj_add_event_cb(obj, lv_event_free, LV_EVENT_DELETE, ecb);
     return JS_UNDEFINED;
 }
 

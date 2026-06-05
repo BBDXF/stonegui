@@ -22,6 +22,9 @@
 #include "lvgl.h"
 #include "quickjs-libc.h"
 #include "src/libs/tiny_ttf/lv_tiny_ttf.h"
+#include "src/drivers/sdl/lv_sdl_window.h"
+
+#include <SDL.h>
 
 /* ── input group (keyboard focus) ───────────────────────────────────────── */
 
@@ -29,6 +32,36 @@ static lv_group_t *g_group = NULL;
 
 void lv_bindings_set_group(lv_group_t *group) {
     g_group = group;
+}
+
+/* ── IME candidate-window positioning ───────────────────────────────────────
+ *
+ * Tell SDL where the focused text field is so the OS IME places its candidate
+ * (composition) window next to the caret instead of at the screen origin.
+ * LVGL screen coordinates are scaled by the SDL window zoom to get pixels.
+ */
+static void sg_update_ime_rect(lv_obj_t *ta) {
+    lv_area_t a;
+    lv_obj_get_coords(ta, &a);
+
+    uint8_t zoom = 1;
+    lv_display_t *disp = lv_display_get_default();
+    if (disp) {
+        uint8_t z = lv_sdl_window_get_zoom(disp);
+        if (z) zoom = z;
+    }
+
+    SDL_Rect rect;
+    rect.x = a.x1 * zoom;
+    rect.y = a.y1 * zoom;
+    rect.w = (a.x2 - a.x1 + 1) * zoom;
+    rect.h = (a.y2 - a.y1 + 1) * zoom;
+    SDL_SetTextInputRect(&rect);
+}
+
+static void sg_ime_event_cb(lv_event_t *e) {
+    lv_obj_t *ta = lv_event_get_target(e);
+    sg_update_ime_rect(ta);
 }
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
@@ -144,7 +177,12 @@ static JSValue js_createNode(JSContext *ctx, JSValueConst this_val,
         lv_obj_center(lbl);
     }
     else if (strcmp(type, "Image")    == 0) obj = lv_image_create(parent);
-    else if (strcmp(type, "Input")    == 0) obj = lv_textarea_create(parent);
+    else if (strcmp(type, "Input")    == 0) {
+        obj = lv_textarea_create(parent);
+        /* Keep the IME candidate window anchored to this field */
+        lv_obj_add_event_cb(obj, sg_ime_event_cb, LV_EVENT_FOCUSED, NULL);
+        lv_obj_add_event_cb(obj, sg_ime_event_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    }
     else if (strcmp(type, "Switch")   == 0) obj = lv_switch_create(parent);
     else if (strcmp(type, "Progress") == 0) obj = lv_bar_create(parent);
     else                                    { obj = lv_obj_create(parent); make_clean_container(obj); }

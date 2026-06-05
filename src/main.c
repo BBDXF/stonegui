@@ -38,6 +38,56 @@ static uint32_t millis(void) {
     return (uint32_t)(ts.tv_sec * 1000 + ts.tv_nsec / 1000000);
 }
 
+/* ── UTF-8 aware keyboard read (CJK / multi-byte input) ─────────────────────
+ *
+ * LVGL's SDL keyboard driver receives full UTF-8 strings from SDL_TEXTINPUT
+ * (IME-composed text), but its default read callback emits the buffer one BYTE
+ * at a time, which splits multi-byte characters (e.g. Chinese) into invalid
+ * single bytes. We replace the read callback with one that emits a whole UTF-8
+ * character per keypress, packed little-endian into data->key — the exact
+ * layout lv_textarea_add_char() expects.
+ *
+ * The driver's private struct begins with `char buf[KEYBOARD_BUFFER_SIZE]`
+ * (the first member), followed by a `bool` flag; we mirror that layout.
+ */
+typedef struct {
+    char buf[KEYBOARD_BUFFER_SIZE];
+    bool dummy_read;
+} sg_sdl_kb_t;
+
+static int utf8_seq_len(unsigned char c) {
+    if (c < 0x80) return 1;            /* ASCII / LV_KEY_* control codes */
+    if ((c & 0xE0) == 0xC0) return 2;
+    if ((c & 0xF0) == 0xE0) return 3;
+    if ((c & 0xF8) == 0xF0) return 4;
+    return 1;                          /* lone continuation byte: skip one */
+}
+
+static void sg_keyboard_read(lv_indev_t *indev, lv_indev_data_t *data) {
+    sg_sdl_kb_t *dev = lv_indev_get_driver_data(indev);
+    if (!dev) return;
+
+    size_t len = strlen(dev->buf);
+
+    if (dev->dummy_read) {
+        dev->dummy_read = false;
+        data->state = LV_INDEV_STATE_RELEASED;
+    } else if (len > 0) {
+        int n = utf8_seq_len((unsigned char)dev->buf[0]);
+        if ((size_t)n > len) n = (int)len;
+
+        uint32_t key = 0;
+        for (int i = 0; i < n; i++)
+            key |= (uint32_t)(unsigned char)dev->buf[i] << (8 * i);
+
+        dev->dummy_read = true;
+        data->state = LV_INDEV_STATE_PRESSED;
+        data->key   = key;
+
+        memmove(dev->buf, dev->buf + n, len - n + 1); /* keep NUL terminator */
+    }
+}
+
 /* ── load a JS module file ──────────────────────────────────────────────── */
 
 static int load_and_run(JSContext *ctx, const char *path) {
@@ -95,6 +145,8 @@ int main(int argc, char *argv[]) {
     lv_indev_t *mouse = lv_sdl_mouse_create();
     (void)mouse;
     lv_indev_t *kb = lv_sdl_keyboard_create();
+    /* Replace the byte-at-a-time read with a UTF-8 aware one (CJK input) */
+    lv_indev_set_read_cb(kb, sg_keyboard_read);
 
     /* Keyboard focus group: keyboard events route to the focused widget */
     lv_group_t *group = lv_group_create();

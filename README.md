@@ -96,6 +96,19 @@ A global input group is wired to the keyboard device. `Input`, `Button` and
 `Switch` widgets are added to it automatically, so you can **click an `Input`
 to focus it and then type**, or `Tab` between focusable widgets.
 
+ASCII and multi-byte **UTF-8 (CJK) input** both work: the host installs a
+UTF-8-aware keyboard read callback that delivers one whole character per
+keypress (LVGL's default SDL driver otherwise splits multi-byte characters and
+corrupts them).
+
+To actually compose Chinese you still need a system **IME** (e.g. fcitx5 or
+ibus) running and active — SDL forwards the IME's composed text to the app.
+With no IME installed, the OS only sends raw Latin keystrokes.
+
+Each `Input` reports its on-screen rectangle to SDL (`SDL_SetTextInputRect`) when
+focused or edited, so the IME's candidate (composition) window follows the input
+box instead of appearing at the screen origin.
+
 ### Responsive layout
 
 The SDL window is resizable. Use percent sizes (`"100%"`) and `flexGrow` so the

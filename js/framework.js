@@ -139,6 +139,12 @@ export function loadFont(path, size) {
     return lv.loadFont(path, size);
 }
 
+/** Set a loaded font (handle from loadFont) as the global default font.
+ *  Individual widgets can still override via the `font` style key. */
+export function setDefaultFont(handle) {
+    if (handle) lv.setDefaultFont(handle);
+}
+
 /* ── Mount ──────────────────────────────────────────────────────────────── */
 
 /**

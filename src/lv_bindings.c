@@ -96,12 +96,31 @@ static void lv_event_free(lv_event_t *e) {
     lv_free(ecb);
 }
 
+/* Strip the default theme's decorations from a generic container so a "View"
+ * behaves like a React-Native View: a transparent, borderless, zero-padding
+ * layout box. User styles (backgroundColor, borderRadius, padding…) layer on
+ * top of this clean slate. */
+static void make_clean_container(lv_obj_t *obj) {
+    lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_outline_width(obj, 0, 0);
+    lv_obj_set_style_radius(obj, 0, 0);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_set_style_pad_row(obj, 0, 0);
+    lv_obj_set_style_pad_column(obj, 0, 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+}
+
 /* ── module functions ───────────────────────────────────────────────────── */
 
 static JSValue js_getScreen(JSContext *ctx, JSValueConst this_val,
                              int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
-    return obj_to_js(ctx, lv_scr_act());
+    lv_obj_t *scr = lv_scr_act();
+    /* Make the root reach the screen edges (theme adds padding by default) */
+    lv_obj_set_style_pad_all(scr, 0, 0);
+    lv_obj_remove_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+    return obj_to_js(ctx, scr);
 }
 
 static JSValue js_createNode(JSContext *ctx, JSValueConst this_val,
@@ -115,7 +134,7 @@ static JSValue js_createNode(JSContext *ctx, JSValueConst this_val,
     lv_obj_t *parent = lv_scr_act();
     lv_obj_t *obj    = NULL;
 
-    if      (strcmp(type, "View")     == 0) obj = lv_obj_create(parent);
+    if      (strcmp(type, "View")     == 0) { obj = lv_obj_create(parent); make_clean_container(obj); }
     else if (strcmp(type, "Text")     == 0) obj = lv_label_create(parent);
     else if (strcmp(type, "Button")   == 0) {
         obj = lv_button_create(parent);
@@ -128,7 +147,7 @@ static JSValue js_createNode(JSContext *ctx, JSValueConst this_val,
     else if (strcmp(type, "Input")    == 0) obj = lv_textarea_create(parent);
     else if (strcmp(type, "Switch")   == 0) obj = lv_switch_create(parent);
     else if (strcmp(type, "Progress") == 0) obj = lv_bar_create(parent);
-    else                                    obj = lv_obj_create(parent);
+    else                                    { obj = lv_obj_create(parent); make_clean_container(obj); }
 
     /* Make interactive widgets reachable by the keyboard/encoder group */
     if (g_group && obj &&
@@ -382,6 +401,26 @@ static JSValue js_loadFont(JSContext *ctx, JSValueConst this_val,
     return result;
 }
 
+/* setDefaultFont(handle) — make a loaded font the global default by re-applying
+ * the default theme with it. All widgets that don't override `font` inherit it. */
+static JSValue js_setDefaultFont(JSContext *ctx, JSValueConst this_val,
+                                  int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 1) return JS_EXCEPTION;
+    int64_t h; JS_ToInt64(ctx, &h, argv[0]);
+    if (!h) return JS_UNDEFINED;
+
+    lv_display_t *disp = lv_display_get_default();
+    lv_theme_t *th = lv_theme_default_init(
+        disp,
+        lv_palette_main(LV_PALETTE_BLUE),
+        lv_palette_main(LV_PALETTE_RED),
+        false,
+        (const lv_font_t *)(uintptr_t)h);
+    lv_display_set_theme(disp, th);
+    return JS_UNDEFINED;
+}
+
 /* ── module export list ─────────────────────────────────────────────────── */
 
 static const JSCFunctionListEntry lv_funcs[] = {
@@ -393,6 +432,7 @@ static const JSCFunctionListEntry lv_funcs[] = {
     JS_CFUNC_DEF("addEvent",     3, js_addEvent),
     JS_CFUNC_DEF("dispose",      1, js_dispose),
     JS_CFUNC_DEF("loadFont",     2, js_loadFont),
+    JS_CFUNC_DEF("setDefaultFont", 1, js_setDefaultFont),
 };
 
 static int lv_module_init(JSContext *ctx, JSModuleDef *m) {

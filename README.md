@@ -49,6 +49,11 @@ SDL (dev)  /  Wayland (production)
 | `Switch`   | `lv_switch`   |
 | `Progress` | `lv_bar`      |
 
+`View` is a transparent, borderless, zero-padding layout box (React-Native
+semantics) — the default LVGL theme decorations are stripped, so a `View` only
+shows what you style. Set `backgroundColor`, `borderRadius`, `padding`, etc.
+explicitly when you want them.
+
 ### Supported props / style keys
 
 * Layout: `width`, `height` (px number, or `"100%"` / `"fill"`), `x`, `y`,
@@ -64,17 +69,26 @@ Any prop or style value may be a function (`() => signal()`) to make it reactive
 ### Fonts & internationalization (CJK / Chinese)
 
 The built-in Montserrat font is Latin-only. To render Chinese (or any other
-script) load a TTF/TTC at runtime and pass the handle via `style.font`:
+script) load a TTF/TTC at runtime. The recommended pattern is a **global default
+font**, overriding per-element only when you need a different size/face:
 
 ```js
-import { loadFont } from "../../js/framework.js";
+import { loadFont, setDefaultFont } from "../../js/framework.js";
 
-const cjk = loadFont("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 20);
-h("Text", { style: { font: cjk }, text: "你好，世界" });
+const body  = loadFont("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 20);
+const title = loadFont("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 30);
+
+setDefaultFont(body);                                   // global default
+h("Text", { text: "你好，世界" });                       // inherits `body`
+h("Text", { style: { font: title }, text: "标题" });    // explicit override
 ```
 
-`loadFont(path, size)` reads the file into memory and builds a Tiny-TTF font;
-it returns `0` if the file can't be opened. Text encoding is UTF-8.
+* `loadFont(path, size)` reads the file into memory and builds a Tiny-TTF font;
+  returns `0` if the file can't be opened. Text encoding is UTF-8.
+* `setDefaultFont(handle)` re-applies the theme with that font as the default, so
+  every widget inherits it unless it sets its own `font`.
+* Tiny-TTF fonts are a fixed pixel size per handle — load one handle per size you
+  need. (`fontSize` only selects the built-in Latin Montserrat sizes.)
 
 ### Keyboard input
 

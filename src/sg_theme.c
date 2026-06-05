@@ -45,6 +45,9 @@ static lv_style_t st_btn, st_btn_pressed;
 static lv_style_t st_field, st_field_focused, st_field_placeholder;
 static lv_style_t st_sw_bg, st_sw_bg_on, st_sw_knob;
 static lv_style_t st_bar_main, st_bar_indic;
+static lv_style_t st_knob;         /* slider / arc knob                          */
+static lv_style_t st_arc_main, st_arc_indic;
+static lv_style_t st_cb_box, st_cb_box_checked;
 
 static void styles_init_once(void) {
     if (g_styles_inited) return;
@@ -124,6 +127,41 @@ static void styles_init_once(void) {
     lv_style_set_bg_color(&st_bar_indic, SG_PRIMARY);
     lv_style_set_bg_opa(&st_bar_indic, LV_OPA_COVER);
     lv_style_set_radius(&st_bar_indic, LV_RADIUS_CIRCLE);
+
+    /* Slider / Arc knob: white circle with a soft shadow (Material thumb). */
+    lv_style_init(&st_knob);
+    lv_style_set_bg_color(&st_knob, lv_color_white());
+    lv_style_set_bg_opa(&st_knob, LV_OPA_COVER);
+    lv_style_set_radius(&st_knob, LV_RADIUS_CIRCLE);
+    lv_style_set_border_width(&st_knob, 0);
+    lv_style_set_shadow_color(&st_knob, lv_color_black());
+    lv_style_set_shadow_opa(&st_knob, LV_OPA_30);
+    lv_style_set_shadow_width(&st_knob, 6);
+    lv_style_set_pad_all(&st_knob, 6);
+
+    /* Arc: light track + primary indicator, rounded line caps. */
+    lv_style_init(&st_arc_main);
+    lv_style_set_arc_color(&st_arc_main, SG_TRACK);
+    lv_style_set_arc_width(&st_arc_main, 10);
+    lv_style_set_arc_rounded(&st_arc_main, true);
+
+    lv_style_init(&st_arc_indic);
+    lv_style_set_arc_color(&st_arc_indic, SG_PRIMARY);
+    lv_style_set_arc_width(&st_arc_indic, 10);
+    lv_style_set_arc_rounded(&st_arc_indic, true);
+
+    /* Checkbox indicator (the box): rounded, outlined; primary when checked. */
+    lv_style_init(&st_cb_box);
+    lv_style_set_radius(&st_cb_box, 4);
+    lv_style_set_bg_color(&st_cb_box, SG_SURFACE);
+    lv_style_set_bg_opa(&st_cb_box, LV_OPA_COVER);
+    lv_style_set_border_color(&st_cb_box, SG_OUTLINE);
+    lv_style_set_border_width(&st_cb_box, 2);
+    lv_style_set_pad_all(&st_cb_box, 4);
+
+    lv_style_init(&st_cb_box_checked);
+    lv_style_set_bg_color(&st_cb_box_checked, SG_PRIMARY);
+    lv_style_set_border_color(&st_cb_box_checked, SG_PRIMARY);
 }
 
 /* ── apply callback: layer our styles by widget class ───────────────────── */
@@ -157,6 +195,25 @@ static void sg_theme_apply_cb(lv_theme_t *th, lv_obj_t *obj) {
     else if (cls == &lv_bar_class) {
         lv_obj_add_style(obj, &st_bar_main, 0);
         lv_obj_add_style(obj, &st_bar_indic, LV_PART_INDICATOR);
+    }
+    else if (cls == &lv_slider_class) {
+        lv_obj_add_style(obj, &st_bar_main, 0);
+        lv_obj_add_style(obj, &st_bar_indic, LV_PART_INDICATOR);
+        lv_obj_add_style(obj, &st_knob, LV_PART_KNOB);
+    }
+    else if (cls == &lv_arc_class) {
+        lv_obj_add_style(obj, &st_arc_main, 0);
+        lv_obj_add_style(obj, &st_arc_indic, LV_PART_INDICATOR);
+        lv_obj_add_style(obj, &st_knob, LV_PART_KNOB);
+    }
+    else if (cls == &lv_spinner_class) {
+        lv_obj_add_style(obj, &st_arc_main, 0);
+        lv_obj_add_style(obj, &st_arc_indic, LV_PART_INDICATOR);
+    }
+    else if (cls == &lv_checkbox_class) {
+        lv_obj_add_style(obj, &st_cb_box, LV_PART_INDICATOR);
+        lv_obj_add_style(obj, &st_cb_box_checked,
+                         LV_PART_INDICATOR | LV_STATE_CHECKED);
     }
     /* Labels/Text intentionally have no style here: they inherit text_color
      * from their nearest ancestor (screen → dark, Button → white). */

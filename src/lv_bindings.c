@@ -113,13 +113,46 @@ typedef struct {
     JSValue    fn;
 } EventCb;
 
+/* Read a widget's "current value" as a JS value, so event handlers can be
+ * called as onChange(value) in the React/Vue style:
+ *   Switch / Checkbox      → bool   (checked)
+ *   Slider / Bar / Arc     → number (value)
+ *   Dropdown / Roller      → number (selected index)
+ *   Input (textarea)       → string (text)
+ *   otherwise              → undefined
+ */
+static JSValue widget_value_to_js(JSContext *ctx, lv_obj_t *obj) {
+    if (!obj) return JS_UNDEFINED;
+    const lv_obj_class_t *cls = lv_obj_get_class(obj);
+
+    if (cls == &lv_switch_class || cls == &lv_checkbox_class)
+        return JS_NewBool(ctx, lv_obj_has_state(obj, LV_STATE_CHECKED));
+    if (cls == &lv_slider_class)
+        return JS_NewInt32(ctx, lv_slider_get_value(obj));
+    if (cls == &lv_bar_class)
+        return JS_NewInt32(ctx, lv_bar_get_value(obj));
+    if (cls == &lv_arc_class)
+        return JS_NewInt32(ctx, lv_arc_get_value(obj));
+    if (cls == &lv_dropdown_class)
+        return JS_NewInt32(ctx, (int32_t)lv_dropdown_get_selected(obj));
+    if (cls == &lv_roller_class)
+        return JS_NewInt32(ctx, (int32_t)lv_roller_get_selected(obj));
+    if (cls == &lv_textarea_class)
+        return JS_NewString(ctx, lv_textarea_get_text(obj));
+
+    return JS_UNDEFINED;
+}
+
 static void lv_event_dispatch(lv_event_t *e) {
     EventCb *ecb = (EventCb *)lv_event_get_user_data(e);
     if (!ecb) return;
-    JSValue ret = JS_Call(ecb->ctx, ecb->fn, JS_UNDEFINED, 0, NULL);
+    lv_obj_t *target = lv_event_get_current_target_obj(e);
+    JSValue arg = widget_value_to_js(ecb->ctx, target);
+    JSValue ret = JS_Call(ecb->ctx, ecb->fn, JS_UNDEFINED, 1, &arg);
     if (JS_IsException(ret))
         js_std_dump_error(ecb->ctx);
     JS_FreeValue(ecb->ctx, ret);
+    JS_FreeValue(ecb->ctx, arg);
 }
 
 /* Released when the owning widget is deleted — frees the JS handler + struct */
@@ -186,13 +219,31 @@ static JSValue js_createNode(JSContext *ctx, JSValueConst this_val,
     }
     else if (strcmp(type, "Switch")   == 0) obj = lv_switch_create(parent);
     else if (strcmp(type, "Progress") == 0) obj = lv_bar_create(parent);
+    else if (strcmp(type, "Slider")   == 0) obj = lv_slider_create(parent);
+    else if (strcmp(type, "Arc")      == 0) obj = lv_arc_create(parent);
+    else if (strcmp(type, "Spinner")  == 0) {
+        obj = lv_spinner_create(parent);
+        lv_spinner_set_anim_params(obj, 1000, 60);
+    }
+    else if (strcmp(type, "Checkbox") == 0) {
+        obj = lv_checkbox_create(parent);
+        lv_checkbox_set_text(obj, "");
+    }
+    else if (strcmp(type, "Dropdown") == 0) obj = lv_dropdown_create(parent);
+    else if (strcmp(type, "Roller")   == 0)
+        obj = lv_roller_create(parent);
     else                                    { obj = lv_obj_create(parent); make_clean_container(obj); }
 
     /* Make interactive widgets reachable by the keyboard/encoder group */
     if (g_group && obj &&
-        (strcmp(type, "Input")  == 0 ||
-         strcmp(type, "Button") == 0 ||
-         strcmp(type, "Switch") == 0)) {
+        (strcmp(type, "Input")    == 0 ||
+         strcmp(type, "Button")   == 0 ||
+         strcmp(type, "Switch")   == 0 ||
+         strcmp(type, "Slider")   == 0 ||
+         strcmp(type, "Arc")      == 0 ||
+         strcmp(type, "Checkbox") == 0 ||
+         strcmp(type, "Dropdown") == 0 ||
+         strcmp(type, "Roller")   == 0)) {
         lv_group_add_obj(g_group, obj);
     }
 
@@ -299,6 +350,8 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
         } else if (cls == &lv_button_class) {
             lv_obj_t *lbl = lv_obj_get_child(obj, 0);
             if (lbl) lv_label_set_text(lbl, v ? v : "");
+        } else if (cls == &lv_checkbox_class) {
+            lv_checkbox_set_text(obj, v ? v : "");
         }
         JS_FreeCString(ctx, v);
     } else if (strcmp(key, "textColor") == 0) {
@@ -331,35 +384,51 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
             lv_image_set_src(obj, v);
         JS_FreeCString(ctx, v);
     }
-    /* ── Progress / bar ── */
+    /* ── Progress / bar / slider / arc / dropdown / roller ── */
     else if (strcmp(key, "value") == 0) {
         int32_t v; JS_ToInt32(ctx, &v, argv[2]);
         const lv_obj_class_t *cls = lv_obj_get_class(obj);
-        if (cls == &lv_bar_class)
-            lv_bar_set_value(obj, v, LV_ANIM_OFF);
+        if      (cls == &lv_bar_class)      lv_bar_set_value(obj, v, LV_ANIM_OFF);
+        else if (cls == &lv_slider_class)   lv_slider_set_value(obj, v, LV_ANIM_OFF);
+        else if (cls == &lv_arc_class)      lv_arc_set_value(obj, v);
+        else if (cls == &lv_dropdown_class) lv_dropdown_set_selected(obj, (uint32_t)v);
+        else if (cls == &lv_roller_class)   lv_roller_set_selected(obj, (uint32_t)v, LV_ANIM_OFF);
     } else if (strcmp(key, "min") == 0) {
         int32_t v; JS_ToInt32(ctx, &v, argv[2]);
         const lv_obj_class_t *cls = lv_obj_get_class(obj);
-        if (cls == &lv_bar_class) {
-            int32_t max = lv_bar_get_max_value(obj);
-            lv_bar_set_range(obj, v, max);
-        }
+        if (cls == &lv_bar_class)
+            lv_bar_set_range(obj, v, lv_bar_get_max_value(obj));
+        else if (cls == &lv_slider_class)
+            lv_slider_set_range(obj, v, lv_slider_get_max_value(obj));
+        else if (cls == &lv_arc_class)
+            lv_arc_set_range(obj, v, lv_arc_get_max_value(obj));
     } else if (strcmp(key, "max") == 0) {
         int32_t v; JS_ToInt32(ctx, &v, argv[2]);
         const lv_obj_class_t *cls = lv_obj_get_class(obj);
-        if (cls == &lv_bar_class) {
-            int32_t min = lv_bar_get_min_value(obj);
-            lv_bar_set_range(obj, min, v);
-        }
+        if (cls == &lv_bar_class)
+            lv_bar_set_range(obj, lv_bar_get_min_value(obj), v);
+        else if (cls == &lv_slider_class)
+            lv_slider_set_range(obj, lv_slider_get_min_value(obj), v);
+        else if (cls == &lv_arc_class)
+            lv_arc_set_range(obj, lv_arc_get_min_value(obj), v);
     }
-    /* ── Switch ── */
+    /* ── Dropdown / Roller options ("a\nb\nc") ── */
+    else if (strcmp(key, "options") == 0) {
+        const char *v = JS_ToCString(ctx, argv[2]);
+        const lv_obj_class_t *cls = lv_obj_get_class(obj);
+        if (v) {
+            if (cls == &lv_dropdown_class)
+                lv_dropdown_set_options(obj, v);
+            else if (cls == &lv_roller_class)
+                lv_roller_set_options(obj, v, LV_ROLLER_MODE_NORMAL);
+        }
+        JS_FreeCString(ctx, v);
+    }
+    /* ── Switch / Checkbox ── */
     else if (strcmp(key, "checked") == 0) {
         int v = JS_ToBool(ctx, argv[2]);
-        const lv_obj_class_t *cls = lv_obj_get_class(obj);
-        if (cls == &lv_switch_class) {
-            if (v) lv_obj_add_state(obj, LV_STATE_CHECKED);
-            else   lv_obj_clear_state(obj, LV_STATE_CHECKED);
-        }
+        if (v) lv_obj_add_state(obj, LV_STATE_CHECKED);
+        else   lv_obj_remove_state(obj, LV_STATE_CHECKED);
     }
     /* ── Input / textarea ── */
     else if (strcmp(key, "placeholder") == 0) {
@@ -372,6 +441,41 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
 
     JS_FreeCString(ctx, key);
     return JS_UNDEFINED;
+}
+
+/* getProperty(node, key) — read back common widget state.
+ *   "value"   → number (slider/bar/arc) or selected index (dropdown/roller),
+ *               or bool (switch/checkbox), or string (input)
+ *   "checked" → bool   (switch/checkbox)
+ *   "text"    → string (input/label)
+ */
+static JSValue js_getProperty(JSContext *ctx, JSValueConst this_val,
+                               int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2) return JS_EXCEPTION;
+
+    lv_obj_t   *obj = js_to_obj(ctx, argv[0]);
+    const char *key = JS_ToCString(ctx, argv[1]);
+    if (!key) return JS_EXCEPTION;
+
+    JSValue out;
+    if (strcmp(key, "checked") == 0) {
+        out = JS_NewBool(ctx, lv_obj_has_state(obj, LV_STATE_CHECKED));
+    } else if (strcmp(key, "text") == 0) {
+        const lv_obj_class_t *cls = lv_obj_get_class(obj);
+        if (cls == &lv_textarea_class)
+            out = JS_NewString(ctx, lv_textarea_get_text(obj));
+        else if (cls == &lv_label_class)
+            out = JS_NewString(ctx, lv_label_get_text(obj));
+        else
+            out = JS_UNDEFINED;
+    } else {
+        /* "value" and anything else → the widget's natural value */
+        out = widget_value_to_js(ctx, obj);
+    }
+
+    JS_FreeCString(ctx, key);
+    return out;
 }
 
 /* addEvent(node, eventName, callback) */
@@ -461,6 +565,7 @@ static const JSCFunctionListEntry lv_funcs[] = {
     JS_CFUNC_DEF("appendChild",  2, js_appendChild),
     JS_CFUNC_DEF("removeChild",  2, js_removeChild),
     JS_CFUNC_DEF("setProperty",  3, js_setProperty),
+    JS_CFUNC_DEF("getProperty",  2, js_getProperty),
     JS_CFUNC_DEF("addEvent",     3, js_addEvent),
     JS_CFUNC_DEF("dispose",      1, js_dispose),
     JS_CFUNC_DEF("loadFont",     2, js_loadFont),

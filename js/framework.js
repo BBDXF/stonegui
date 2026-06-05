@@ -148,6 +148,12 @@ const HOST_TAGS = {
     input:    "Input",
     switch:   "Switch",
     progress: "Progress",
+    slider:   "Slider",
+    arc:      "Arc",
+    spinner:  "Spinner",
+    checkbox: "Checkbox",
+    dropdown: "Dropdown",
+    roller:   "Roller",
 };
 
 /**
@@ -185,6 +191,12 @@ export function loadFont(path, size) {
  *  Individual widgets can still override via the `font` style key. */
 export function setDefaultFont(handle) {
     if (handle) lv.setDefaultFont(handle);
+}
+
+/** Read back a widget's current state (e.g. inside an event handler):
+ *   getProperty(node, "value" | "checked" | "text"). */
+export function getProperty(node, key) {
+    return lv.getProperty(node, key);
 }
 
 /* ── Mount ──────────────────────────────────────────────────────────────── */

@@ -42,6 +42,10 @@ function App() {
   const [count, setCount] = createSignal(0);
   const [progress, setProgress] = createSignal(20);
   const [on, setOn] = createSignal(false);
+  const [volume, setVolume] = createSignal(40);
+  const [agree, setAgree] = createSignal(false);
+  const [fruit, setFruit] = createSignal(0);
+  const FRUITS = ["\u82F9\u679C", "\u9999\u8549", "\u6A59\u5B50"];
   return /* @__PURE__ */ h(
     "view",
     {
@@ -96,12 +100,49 @@ function App() {
     /* @__PURE__ */ h(Row, { height: 48 }, /* @__PURE__ */ h(
       Stat,
       {
+        color: "#fab387",
+        label: "\u97F3\u91CF",
+        value: () => `${volume()}`,
+        width: 200
+      }
+    ), /* @__PURE__ */ h(
+      "slider",
+      {
+        style: { flexGrow: 1, height: 10 },
+        min: 0,
+        max: 100,
+        value: () => volume(),
+        onChange: (v) => setVolume(v)
+      }
+    )),
+    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
+    /* @__PURE__ */ h(Row, { height: 48 }, /* @__PURE__ */ h(
+      Stat,
+      {
         color: "#f9e2af",
         label: "\u5F00\u5173",
         value: () => on() ? "\u5F00" : "\u5173",
         width: 200
       }
-    ), /* @__PURE__ */ h("switch", { checked: () => on(), onChange: () => setOn((v) => !v) })),
+    ), /* @__PURE__ */ h("switch", { checked: () => on(), onChange: (v) => setOn(v) })),
+    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
+    /* @__PURE__ */ h(Row, { height: 56 }, /* @__PURE__ */ h(
+      "checkbox",
+      {
+        text: "\u540C\u610F\u6761\u6B3E",
+        style: { textColor: "#cdd6f4", width: 200 },
+        checked: () => agree(),
+        onChange: (v) => setAgree(v)
+      }
+    ), /* @__PURE__ */ h(
+      "dropdown",
+      {
+        style: { width: 160 },
+        options: FRUITS.join("\n"),
+        value: () => fruit(),
+        onChange: (i) => setFruit(i)
+      }
+    ), /* @__PURE__ */ h("view", { style: { width: 16 } }), /* @__PURE__ */ h("text", { style: { textColor: "#bac2de", width: 120, height: 32 } }, () => `\u9009\u62E9: ${FRUITS[fruit()]}`), /* @__PURE__ */ h("spinner", { style: { width: 36, height: 36 } })),
     /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
     /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("text", { style: { textColor: "#94e2d5", width: "100%", height: 32 } }, "\u6280\u672F\u6808 / Stack:"), /* @__PURE__ */ h(Row, { height: 40 }, FEATURES.map((name) => /* @__PURE__ */ h("text", { style: { textColor: "#bac2de", width: 130, height: 32 } }, `\u2022 ${name}`))))
   );

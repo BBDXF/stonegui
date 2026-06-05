@@ -90,6 +90,11 @@ function App() {
     const [count, setCount]       = createSignal(0);
     const [progress, setProgress] = createSignal(20);
     const [on, setOn]             = createSignal(false);
+    const [volume, setVolume]     = createSignal(40);
+    const [agree, setAgree]       = createSignal(false);
+    const [fruit, setFruit]       = createSignal(0);
+
+    const FRUITS = ["苹果", "香蕉", "橙子"];
 
     return (
         <view
@@ -137,11 +142,41 @@ function App() {
 
             <view style={{ height: 12, width: "100%" }} />
 
+            {/* Slider — onChange receives the slider's value */}
+            <Row height={48}>
+                <Stat color="#fab387" label="音量"
+                      value={() => `${volume()}`} width={200} />
+                <slider style={{ flexGrow: 1, height: 10 }}
+                        min={0} max={100} value={() => volume()}
+                        onChange={(v) => setVolume(v)} />
+            </Row>
+
+            <view style={{ height: 12, width: "100%" }} />
+
             {/* Switch */}
             <Row height={48}>
                 <Stat color="#f9e2af" label="开关"
                       value={() => (on() ? "开" : "关")} width={200} />
-                <switch checked={() => on()} onChange={() => setOn((v) => !v)} />
+                <switch checked={() => on()} onChange={(v) => setOn(v)} />
+            </Row>
+
+            <view style={{ height: 12, width: "100%" }} />
+
+            {/* Checkbox + Dropdown + Spinner */}
+            <Row height={56}>
+                <checkbox text="同意条款"
+                          style={{ textColor: "#cdd6f4", width: 200 }}
+                          checked={() => agree()}
+                          onChange={(v) => setAgree(v)} />
+                <dropdown style={{ width: 160 }}
+                          options={FRUITS.join("\n")}
+                          value={() => fruit()}
+                          onChange={(i) => setFruit(i)} />
+                <view style={{ width: 16 }} />
+                <text style={{ textColor: "#bac2de", width: 120, height: 32 }}>
+                    {() => `选择: ${FRUITS[fruit()]}`}
+                </text>
+                <spinner style={{ width: 36, height: 36 }} />
             </Row>
 
             <view style={{ height: 12, width: "100%" }} />

@@ -89,12 +89,18 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     lv_display_set_default(disp);
+    lv_sdl_window_set_resizeable(disp, true);
 
     /* 3. Input devices */
     lv_indev_t *mouse = lv_sdl_mouse_create();
     (void)mouse;
     lv_indev_t *kb = lv_sdl_keyboard_create();
-    (void)kb;
+
+    /* Keyboard focus group: keyboard events route to the focused widget */
+    lv_group_t *group = lv_group_create();
+    lv_group_set_default(group);
+    lv_indev_set_group(kb, group);
+    lv_bindings_set_group(group);
 
     /* 4. QuickJS runtime */
     JSRuntime *rt = JS_NewRuntime();

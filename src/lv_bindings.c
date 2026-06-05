@@ -21,6 +21,15 @@
 
 #include "lvgl.h"
 #include "quickjs-libc.h"
+#include "src/libs/tiny_ttf/lv_tiny_ttf.h"
+
+/* ── input group (keyboard focus) ───────────────────────────────────────── */
+
+static lv_group_t *g_group = NULL;
+
+void lv_bindings_set_group(lv_group_t *group) {
+    g_group = group;
+}
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
@@ -40,6 +49,27 @@ static lv_color_t parse_color(const char *s) {
     unsigned int r = 0, g = 0, b = 0;
     sscanf(s + 1, "%02x%02x%02x", &r, &g, &b);
     return lv_color_make(r, g, b);
+}
+
+/* size value: number → px; string "NN%" → lv_pct(NN); "fill"/"100%" → 100% */
+static int32_t parse_size(JSContext *ctx, JSValueConst v) {
+    if (JS_IsString(v)) {
+        const char *s = JS_ToCString(ctx, v);
+        int32_t out = 0;
+        if (s) {
+            if (strcmp(s, "fill") == 0) {
+                out = lv_pct(100);
+            } else {
+                int n = 0;
+                if (sscanf(s, "%d", &n) == 1)
+                    out = (strchr(s, '%') != NULL) ? lv_pct(n) : n;
+            }
+        }
+        JS_FreeCString(ctx, s);
+        return out;
+    }
+    int32_t n; JS_ToInt32(ctx, &n, v);
+    return n;
 }
 
 /* ── event callback bridge ──────────────────────────────────────────────── */
@@ -100,6 +130,14 @@ static JSValue js_createNode(JSContext *ctx, JSValueConst this_val,
     else if (strcmp(type, "Progress") == 0) obj = lv_bar_create(parent);
     else                                    obj = lv_obj_create(parent);
 
+    /* Make interactive widgets reachable by the keyboard/encoder group */
+    if (g_group && obj &&
+        (strcmp(type, "Input")  == 0 ||
+         strcmp(type, "Button") == 0 ||
+         strcmp(type, "Switch") == 0)) {
+        lv_group_add_obj(g_group, obj);
+    }
+
     JS_FreeCString(ctx, type);
     return obj_to_js(ctx, obj);
 }
@@ -143,11 +181,9 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
 
     /* ── layout / size ── */
     if (strcmp(key, "width") == 0) {
-        int32_t v; JS_ToInt32(ctx, &v, argv[2]);
-        lv_obj_set_width(obj, v);
+        lv_obj_set_width(obj, parse_size(ctx, argv[2]));
     } else if (strcmp(key, "height") == 0) {
-        int32_t v; JS_ToInt32(ctx, &v, argv[2]);
-        lv_obj_set_height(obj, v);
+        lv_obj_set_height(obj, parse_size(ctx, argv[2]));
     } else if (strcmp(key, "x") == 0) {
         int32_t v; JS_ToInt32(ctx, &v, argv[2]);
         lv_obj_set_x(obj, v);
@@ -219,6 +255,15 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
         else if (v >= 20) f = &lv_font_montserrat_20;
         else if (v >= 16) f = &lv_font_montserrat_16;
         lv_obj_set_style_text_font(obj, f, 0);
+    } else if (strcmp(key, "font") == 0) {
+        /* int handle returned by loadFont() */
+        int64_t h; JS_ToInt64(ctx, &h, argv[2]);
+        if (h) lv_obj_set_style_text_font(obj, (const lv_font_t *)(uintptr_t)h, 0);
+    } else if (strcmp(key, "scrollable") == 0) {
+        if (JS_ToBool(ctx, argv[2]))
+            lv_obj_add_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+        else
+            lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
     }
     /* ── Image ── */
     else if (strcmp(key, "src") == 0) {
@@ -300,6 +345,43 @@ static JSValue js_addEvent(JSContext *ctx, JSValueConst this_val,
     return JS_UNDEFINED;
 }
 
+/* loadFont(path, size) → font handle (int), or 0 on failure.
+ * Reads the TTF/TTC file fully into memory (kept alive for the font lifetime)
+ * and builds a Tiny-TTF font. Supports CJK and arbitrary sizes. */
+static JSValue js_loadFont(JSContext *ctx, JSValueConst this_val,
+                            int argc, JSValueConst *argv) {
+    (void)this_val;
+    if (argc < 2) return JS_EXCEPTION;
+
+    const char *path = JS_ToCString(ctx, argv[0]);
+    int32_t size; JS_ToInt32(ctx, &size, argv[1]);
+    if (!path) return JS_EXCEPTION;
+
+    JSValue result = JS_NewInt64(ctx, 0);
+    FILE *f = fopen(path, "rb");
+    if (f) {
+        fseek(f, 0, SEEK_END);
+        long len = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        if (len > 0) {
+            /* Intentionally not freed: Tiny-TTF references this buffer. */
+            uint8_t *buf = lv_malloc((size_t)len);
+            if (buf && fread(buf, 1, (size_t)len, f) == (size_t)len) {
+                lv_font_t *font = lv_tiny_ttf_create_data(buf, (size_t)len, size);
+                if (font)
+                    result = obj_to_js(ctx, (lv_obj_t *)font);
+                else
+                    lv_free(buf);
+            } else if (buf) {
+                lv_free(buf);
+            }
+        }
+        fclose(f);
+    }
+    JS_FreeCString(ctx, path);
+    return result;
+}
+
 /* ── module export list ─────────────────────────────────────────────────── */
 
 static const JSCFunctionListEntry lv_funcs[] = {
@@ -310,6 +392,7 @@ static const JSCFunctionListEntry lv_funcs[] = {
     JS_CFUNC_DEF("setProperty",  3, js_setProperty),
     JS_CFUNC_DEF("addEvent",     3, js_addEvent),
     JS_CFUNC_DEF("dispose",      1, js_dispose),
+    JS_CFUNC_DEF("loadFont",     2, js_loadFont),
 };
 
 static int lv_module_init(JSContext *ctx, JSModuleDef *m) {

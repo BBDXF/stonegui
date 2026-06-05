@@ -51,15 +51,41 @@ SDL (dev)  /  Wayland (production)
 
 ### Supported props / style keys
 
-* Layout: `width`, `height`, `x`, `y`, `flexFlow` (`"row"`/`"column"`),
-  `flexGrow`, `padding`
+* Layout: `width`, `height` (px number, or `"100%"` / `"fill"`), `x`, `y`,
+  `flexFlow` (`"row"`/`"column"`), `flexGrow`, `padding`, `scrollable`
 * Appearance: `backgroundColor`, `borderRadius`, `borderWidth`, `borderColor`,
-  `textColor`, `fontSize` (14/16/20/24)
+  `textColor`, `fontSize` (14/16/20/24), `font` (handle from `loadFont`)
 * Content: `text`, `placeholder`, `src` (Image), `value`/`min`/`max` (Progress),
   `checked` (Switch)
 * Events: `onClick`, `onLongPress`, `onChange`, `onFocus`, `onBlur`
 
 Any prop or style value may be a function (`() => signal()`) to make it reactive.
+
+### Fonts & internationalization (CJK / Chinese)
+
+The built-in Montserrat font is Latin-only. To render Chinese (or any other
+script) load a TTF/TTC at runtime and pass the handle via `style.font`:
+
+```js
+import { loadFont } from "../../js/framework.js";
+
+const cjk = loadFont("/usr/share/fonts/truetype/wqy/wqy-microhei.ttc", 20);
+h("Text", { style: { font: cjk }, text: "你好，世界" });
+```
+
+`loadFont(path, size)` reads the file into memory and builds a Tiny-TTF font;
+it returns `0` if the file can't be opened. Text encoding is UTF-8.
+
+### Keyboard input
+
+A global input group is wired to the keyboard device. `Input`, `Button` and
+`Switch` widgets are added to it automatically, so you can **click an `Input`
+to focus it and then type**, or `Tab` between focusable widgets.
+
+### Responsive layout
+
+The SDL window is resizable. Use percent sizes (`"100%"`) and `flexGrow` so the
+UI reflows when the window is resized.
 
 ## Build & run
 
@@ -78,6 +104,7 @@ resolve at runtime.
 ## Status
 
 MVP on LVGL 9.x + QuickJS + SDL2 (Linux). Implemented: the components above,
-style props, click/value events, signals with fine-grained updates, and ES
-module loading. Planned next: hot reload, framework adapters
-(Solid/Preact), and a Wayland backend.
+style props, click/value events, signals with fine-grained updates, ES module
+loading, keyboard input (focus group), runtime TTF/CJK fonts, and a resizable
+window with percent-based responsive sizing. Planned next: hot reload,
+framework adapters (Solid/Preact), and a Wayland backend.

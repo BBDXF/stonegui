@@ -132,6 +132,13 @@ export function h(type, props, ...children) {
     return new VNode(type, props, flat);
 }
 
+/* ── Native helpers re-exported for apps ────────────────────────────────── */
+
+/** Load a TTF/TTC font from disk at a pixel size. Returns 0 on failure. */
+export function loadFont(path, size) {
+    return lv.loadFont(path, size);
+}
+
 /* ── Mount ──────────────────────────────────────────────────────────────── */
 
 /**

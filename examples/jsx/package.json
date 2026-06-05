@@ -1,0 +1,13 @@
+{
+  "name": "stonegui-jsx-demo",
+  "private": true,
+  "type": "module",
+  "description": "JSX (React/Vue-style) demo for stonegui, transpiled with esbuild.",
+  "scripts": {
+    "build": "esbuild app.jsx --outfile=app.js --format=esm --jsx-factory=h --jsx-fragment=Fragment --loader:.jsx=jsx --log-level=warning",
+    "watch": "npm run build -- --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}

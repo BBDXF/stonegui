@@ -49,6 +49,11 @@ SDL (dev)  /  Wayland (production)
 | `Switch`   | `lv_switch`   |
 | `Progress` | `lv_bar`      |
 
+In JSX these are the lowercase host tags (`view`, `text`, …); the canonical
+names above also work. You can define your own **function components** that take
+props and `children` and return elements, and group siblings with a `Fragment`
+(`<>…</>`).
+
 `View` is a transparent, borderless, zero-padding layout box (React-Native
 semantics) — the default LVGL theme decorations are stripped, so a `View` only
 shows what you style. Set `backgroundColor`, `borderRadius`, `padding`, etc.
@@ -127,6 +132,37 @@ cmake --build build
 
 The build copies `js/` and `examples/` next to the binary so relative imports
 resolve at runtime.
+
+## Examples
+
+### `examples/hello` — hyperscript
+
+Uses the `h(type, props, …children)` factory directly. No build step; just run:
+
+```sh
+./build/stonegui examples/hello/app.js
+```
+
+### `examples/jsx` — JSX (React/Vue style)
+
+Real JSX, transpiled to plain JS with esbuild (QuickJS can't parse JSX itself).
+
+```sh
+cd examples/jsx
+npm install        # once — installs esbuild (dev dependency)
+npm run build      # app.jsx → app.js  (or: npm run watch)
+cd ../..
+./build/stonegui examples/jsx/app.js
+```
+
+It shows function components with props/`children`, fragments (`<>…</>`), list
+rendering with `.map()`, signals/events, and Chinese text. Conventions follow
+React DOM: **lowercase tags are host widgets** (`view`, `text`, `button`,
+`switch`, `progress`, `input`, `image`) and **Capitalized tags are components**.
+
+`node_modules/` is gitignored — `app.js` is committed so the demo runs without
+installing anything; you only need `npm install` to re-build after editing
+`app.jsx`.
 
 ## Status
 

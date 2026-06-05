@@ -101,6 +101,12 @@ function applyProp(native, key, value) {
 }
 
 function mountVNode(vnode, parentNative) {
+    /* Fragment: no native node of its own — mount children into the parent */
+    if (vnode.type === Fragment) {
+        for (const child of vnode.children) mountChild(child, parentNative);
+        return parentNative;
+    }
+
     const native = lv.createNode(vnode.type);
     vnode.native = native;
 
@@ -109,26 +115,62 @@ function mountVNode(vnode, parentNative) {
 
     for (const [k, v] of Object.entries(vnode.props)) applyProp(native, k, v);
 
-    for (const child of vnode.children) {
-        if (child instanceof VNode) {
-            mountVNode(child, native);
-        } else if (typeof child === "function") {
-            /* Reactive text child */
-            createEffect(() => lv.setProperty(native, "text", String(child())));
-        } else if (child !== null && child !== undefined) {
-            /* Bare string/number → text shorthand on this node */
-            lv.setProperty(native, "text", String(child));
-        }
-    }
+    for (const child of vnode.children) mountChild(child, native);
 
     return native;
 }
 
+/* Mount a single child into a native parent node. */
+function mountChild(child, parentNative) {
+    if (child instanceof VNode) {
+        mountVNode(child, parentNative);
+    } else if (typeof child === "function") {
+        /* Reactive text child: updates the parent's text on signal change */
+        createEffect(() => lv.setProperty(parentNative, "text", String(child())));
+    } else if (child !== null && child !== undefined && child !== false) {
+        /* Bare string/number → text shorthand on this node */
+        lv.setProperty(parentNative, "text", String(child));
+    }
+}
+
 /* ── JSX factory ────────────────────────────────────────────────────────── */
 
+/** Fragment marker for `<>…</>` (groups children with no wrapper node). */
+export const Fragment = Symbol("Fragment");
+
+/* Lowercase JSX tags map to host widgets (React-DOM convention:
+ * lowercase = host element, Capitalized = component). */
+const HOST_TAGS = {
+    view:     "View",
+    text:     "Text",
+    button:   "Button",
+    image:    "Image",
+    input:    "Input",
+    switch:   "Switch",
+    progress: "Progress",
+};
+
+/**
+ * h(type, props, ...children) — the JSX factory (set `jsxFactory: "h"`).
+ *
+ *  - type is a string  → a host element (`view`, `text`, `button`, … or the
+ *      canonical `View`/`Text`/… names).
+ *  - type is a function → a component; it is invoked with props augmented with
+ *      `children`, and must return a VNode (or Fragment).
+ *  - type is Fragment   → a transparent group of children.
+ */
 export function h(type, props, ...children) {
-    /* Flatten nested arrays (JSX maps) */
+    /* Flatten nested arrays (JSX maps / spread children) */
     const flat = children.flat(Infinity);
+
+    if (typeof type === "function") {
+        return type({ ...(props || {}), children: flat });
+    }
+
+    if (typeof type === "string") {
+        type = HOST_TAGS[type] || type;
+    }
+
     return new VNode(type, props, flat);
 }
 

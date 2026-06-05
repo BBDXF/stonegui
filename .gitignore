@@ -68,3 +68,7 @@ vcpkg_installed/
 Testing/
 .cache/
 third_party/
+
+# Node
+node_modules/
+examples/jsx/package-lock.json

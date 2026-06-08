@@ -21,8 +21,14 @@ const loadCjk = (size) => {
 };
 const fontTitle = loadCjk(30);
 setDefaultFont(loadCjk(20));
-function Row({ height = 56, children }) {
-  return /* @__PURE__ */ h("view", { style: { flexFlow: "row", width: "100%", height } }, children);
+function Row({ height = 56, gap = 12, children }) {
+  return /* @__PURE__ */ h("view", { style: {
+    flexFlow: "row",
+    width: "100%",
+    height,
+    gap,
+    alignItems: "center"
+  } }, children);
 }
 function PillButton({ color, onClick, width = 120, children }) {
   return /* @__PURE__ */ h(
@@ -35,7 +41,7 @@ function PillButton({ color, onClick, width = 120, children }) {
   );
 }
 function Stat({ color, label, value, width = 240 }) {
-  return /* @__PURE__ */ h("text", { style: { textColor: color, width, height: 40 } }, () => `${label}: ${value()}`);
+  return /* @__PURE__ */ h("text", { style: { textColor: color, width } }, () => `${label}: ${value()}`);
 }
 const FEATURES = ["LVGL 9", "QuickJS", "SDL2", "JSX"];
 function App() {
@@ -54,15 +60,15 @@ function App() {
         height: "100%",
         backgroundColor: "#1e1e2e",
         padding: 20,
-        flexFlow: "column"
+        flexFlow: "column",
+        gap: 12
       }
     },
     /* @__PURE__ */ h("text", { style: { textColor: "white", font: fontTitle } }, "JSX \u6F14\u793A / Demo"),
-    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
     /* @__PURE__ */ h(Row, null, /* @__PURE__ */ h(Stat, { color: "#a6e3a1cc", label: "\u8BA1\u6570", value: count }), /* @__PURE__ */ h(PillButton, { color: "blue", onClick: () => {
       setCount((c) => c + 1);
       setProgress((c) => c + 1);
-    } }, "\u52A0\u4E00"), /* @__PURE__ */ h("view", { style: { width: 12 } }), /* @__PURE__ */ h(
+    } }, "\u52A0\u4E00"), /* @__PURE__ */ h(
       PillButton,
       {
         color: "pink",
@@ -73,7 +79,6 @@ function App() {
       },
       "\u91CD\u7F6E"
     )),
-    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
     /* @__PURE__ */ h(Row, null, /* @__PURE__ */ h(
       Stat,
       {
@@ -90,7 +95,7 @@ function App() {
         max: 100,
         value: () => progress()
       }
-    ), /* @__PURE__ */ h("view", { style: { width: 12 } }), /* @__PURE__ */ h(
+    ), /* @__PURE__ */ h(
       PillButton,
       {
         color: "lime",
@@ -99,7 +104,6 @@ function App() {
       },
       "+10%"
     )),
-    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
     /* @__PURE__ */ h(Row, { height: 48 }, /* @__PURE__ */ h(
       Stat,
       {
@@ -118,7 +122,6 @@ function App() {
         onChange: (v) => setVolume(v)
       }
     )),
-    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
     /* @__PURE__ */ h(Row, { height: 48 }, /* @__PURE__ */ h(
       Stat,
       {
@@ -128,7 +131,6 @@ function App() {
         width: 200
       }
     ), /* @__PURE__ */ h("switch", { checked: () => on(), onChange: (v) => setOn(v) })),
-    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
     /* @__PURE__ */ h(Row, { height: 56 }, /* @__PURE__ */ h(
       "checkbox",
       {
@@ -145,9 +147,25 @@ function App() {
         value: () => fruit(),
         onChange: (i) => setFruit(i)
       }
-    ), /* @__PURE__ */ h("view", { style: { width: 16 } }), /* @__PURE__ */ h("text", { style: { textColor: "#bac2dedd", width: 120, height: 32 } }, () => `\u9009\u62E9: ${FRUITS[fruit()]}`), /* @__PURE__ */ h("spinner", { style: { width: 36, height: 36 } })),
-    /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
-    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("text", { style: { textColor: "cyan", width: "100%", height: 32 } }, "\u6280\u672F\u6808 / Stack:"), /* @__PURE__ */ h(Row, { height: 40 }, FEATURES.map((name) => /* @__PURE__ */ h("text", { style: { textColor: "gray", width: 130, height: 32 } }, `\u2022 ${name}`))))
+    ), /* @__PURE__ */ h("text", { style: { textColor: "#bac2dedd", width: 120 } }, () => `\u9009\u62E9: ${FRUITS[fruit()]}`), /* @__PURE__ */ h("spinner", { style: { width: 36, height: 36 }, spinTime: 2800 })),
+    /* @__PURE__ */ h(Row, { height: 80 }, /* @__PURE__ */ h(
+      Stat,
+      {
+        color: "#94e2d5",
+        label: "\u5706\u5F27",
+        value: () => `${progress()}%`,
+        width: 200
+      }
+    ), /* @__PURE__ */ h(
+      "arc",
+      {
+        style: { width: 72, height: 72 },
+        min: 0,
+        max: 100,
+        value: () => progress()
+      }
+    )),
+    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("text", { style: { textColor: "cyan", width: "100%", height: 32 } }, "\u6280\u672F\u6808 / Stack:"), /* @__PURE__ */ h(Row, { height: 40 }, FEATURES.map((name) => /* @__PURE__ */ h("text", { style: { textColor: "gray", width: 130 } }, `\u2022 ${name}`))))
   );
 }
 render(() => /* @__PURE__ */ h(App, null));

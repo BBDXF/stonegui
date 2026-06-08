@@ -51,10 +51,12 @@ setDefaultFont(loadCjk(20));
 
 /* ── Reusable components ─────────────────────────────────────────────────── */
 
-/* A horizontal row that lays its children out left-to-right. */
-function Row({ height = 56, children }) {
+/* A horizontal row that lays its children out left-to-right.
+ * Children are vertically centred so widgets of different heights align. */
+function Row({ height = 56, gap = 12, children }) {
     return (
-        <view style={{ flexFlow: "row", width: "100%", height }}>
+        <view style={{ flexFlow: "row", width: "100%", height, gap,
+                       alignItems: "center" }}>
             {children}
         </view>
     );
@@ -73,10 +75,11 @@ function PillButton({ color, onClick, width = 120, children }) {
 }
 
 /* A labelled, reactive value, e.g.  计数: 3
- * `value` is an accessor (signal getter or thunk) so updates are property-only. */
+ * `value` is an accessor (signal getter or thunk) so updates are property-only.
+ * No fixed height: the label sizes to its text so the row can centre it. */
 function Stat({ color, label, value, width = 240 }) {
     return (
-        <text style={{ textColor: color, width, height: 40 }}>
+        <text style={{ textColor: color, width }}>
             {() => `${label}: ${value()}`}
         </text>
     );
@@ -104,14 +107,13 @@ function App() {
                 backgroundColor: "#1e1e2e",
                 padding: 20,
                 flexFlow: "column",
+                gap: 12,
             }}
         >
             {/* textColor: "white" — 颜色名称 */}
             <text style={{ textColor: "white", font: fontTitle }}>
                 JSX 演示 / Demo
             </text>
-
-            <view style={{ height: 12, width: "100%" }} />
 
             {/* Counter */}
             <Row>
@@ -121,15 +123,12 @@ function App() {
                 <PillButton color="blue" onClick={() => {setCount((c) => c + 1); setProgress((c) => c + 1);}}>
                     加一
                 </PillButton>
-                <view style={{ width: 12 }} />
                 {/* "pink" — 颜色名称 */}
                 <PillButton color="pink"
                             onClick={() => { setCount(0); setProgress(0); }}>
                     重置
                 </PillButton>
             </Row>
-
-            <view style={{ height: 12, width: "100%" }} />
 
             {/* Progress */}
             <Row>
@@ -138,15 +137,12 @@ function App() {
                       value={() => `${progress()}%`} width={200} />
                 <progress style={{ flexGrow: 1, height: 24, borderRadius: 12 }}
                           min={0} max={100} value={() => progress()} />
-                <view style={{ width: 12 }} />
                 {/* "lime" — 颜色名称 */}
                 <PillButton color="lime" width={110}
                             onClick={() => setProgress((p) => Math.min(100, p + 10))}>
                     +10%
                 </PillButton>
             </Row>
-
-            <view style={{ height: 12, width: "100%" }} />
 
             {/* Slider — onChange receives the slider's value */}
             <Row height={48}>
@@ -158,8 +154,6 @@ function App() {
                         onChange={(v) => setVolume(v)} />
             </Row>
 
-            <view style={{ height: 12, width: "100%" }} />
-
             {/* Switch */}
             <Row height={48}>
                 {/* "#f9e2af80" — #rrggbbaa，约 50% 不透明 */}
@@ -167,8 +161,6 @@ function App() {
                       value={() => (on() ? "开" : "关")} width={200} />
                 <switch checked={() => on()} onChange={(v) => setOn(v)} />
             </Row>
-
-            <view style={{ height: 12, width: "100%" }} />
 
             {/* Checkbox + Dropdown + Spinner */}
             <Row height={56}>
@@ -181,15 +173,21 @@ function App() {
                           options={FRUITS.join("\n")}
                           value={() => fruit()}
                           onChange={(i) => setFruit(i)} />
-                <view style={{ width: 16 }} />
                 {/* textColor: "#bac2dedd" — #rrggbbaa，约 87% 不透明 */}
-                <text style={{ textColor: "#bac2dedd", width: 120, height: 32 }}>
+                <text style={{ textColor: "#bac2dedd", width: 120 }}>
                     {() => `选择: ${FRUITS[fruit()]}`}
                 </text>
-                <spinner style={{ width: 36, height: 36 }} />
+                <spinner style={{ width: 36, height: 36 }} spinTime={2800} />
             </Row>
 
-            <view style={{ height: 12, width: "100%" }} />
+            {/* Arc — a circular, value-driven gauge bound to `progress` */}
+            <Row height={80}>
+                {/* "#94e2d5" — 颜色名称 */}
+                <Stat color="#94e2d5" label="圆弧"
+                      value={() => `${progress()}%`} width={200} />
+                <arc style={{ width: 72, height: 72 }}
+                     min={0} max={100} value={() => progress()} />
+            </Row>
 
             {/* List rendering with .map() wrapped in a Fragment */}
             <>
@@ -199,7 +197,7 @@ function App() {
                 </text>
                 <Row height={40}>
                     {FEATURES.map((name) => (
-                        <text style={{ textColor: "gray", width: 130, height: 32 }}>
+                        <text style={{ textColor: "gray", width: 130 }}>
                             {`• ${name}`}
                         </text>
                     ))}

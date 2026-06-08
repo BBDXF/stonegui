@@ -260,6 +260,9 @@ static void make_clean_container(lv_obj_t *obj) {
 
 /* ── module functions ───────────────────────────────────────────────────── */
 
+/* Fixed spinner arc length (degrees); only the spin period is configurable. */
+#define SG_SPINNER_ARC_ANGLE 360
+
 static JSValue js_getScreen(JSContext *ctx, JSValueConst this_val,
                              int argc, JSValueConst *argv) {
     (void)this_val; (void)argc; (void)argv;
@@ -303,7 +306,7 @@ static JSValue js_createNode(JSContext *ctx, JSValueConst this_val,
     else if (strcmp(type, "Arc")      == 0) obj = lv_arc_create(parent);
     else if (strcmp(type, "Spinner")  == 0) {
         obj = lv_spinner_create(parent);
-        lv_spinner_set_anim_params(obj, 1000, 60);
+        lv_spinner_set_anim_params(obj, 10000, SG_SPINNER_ARC_ANGLE);
     }
     else if (strcmp(type, "Checkbox") == 0) {
         obj = lv_checkbox_create(parent);
@@ -392,6 +395,32 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
     } else if (strcmp(key, "flexGrow") == 0) {
         int32_t v; JS_ToInt32(ctx, &v, argv[2]);
         lv_obj_set_flex_grow(obj, (uint8_t)v);
+    }
+    /* ── flex alignment ── */
+    else if (strcmp(key, "alignItems") == 0 ||
+             strcmp(key, "justifyContent") == 0) {
+        const char *v = JS_ToCString(ctx, argv[2]);
+        lv_flex_align_t a = LV_FLEX_ALIGN_START;
+        if (v) {
+            if      (strcmp(v, "center")  == 0) a = LV_FLEX_ALIGN_CENTER;
+            else if (strcmp(v, "end")     == 0) a = LV_FLEX_ALIGN_END;
+            else if (strcmp(v, "between") == 0) a = LV_FLEX_ALIGN_SPACE_BETWEEN;
+            else if (strcmp(v, "around")  == 0) a = LV_FLEX_ALIGN_SPACE_AROUND;
+            else if (strcmp(v, "evenly")  == 0) a = LV_FLEX_ALIGN_SPACE_EVENLY;
+            else                                a = LV_FLEX_ALIGN_START;
+        }
+        /* alignItems → cross axis, justifyContent → main axis (CSS naming) */
+        if (strcmp(key, "alignItems") == 0)
+            lv_obj_set_style_flex_cross_place(obj, a, 0);
+        else
+            lv_obj_set_style_flex_main_place(obj, a, 0);
+        JS_FreeCString(ctx, v);
+    }
+    /* ── flex gap (CSS `gap`): spacing between children, both axes ── */
+    else if (strcmp(key, "gap") == 0) {
+        int32_t v; JS_ToInt32(ctx, &v, argv[2]);
+        lv_obj_set_style_pad_row(obj, v, 0);
+        lv_obj_set_style_pad_column(obj, v, 0);
     }
     /* ── padding / margin ── */
     else if (strcmp(key, "padding") == 0) {
@@ -523,6 +552,16 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
             lv_textarea_set_placeholder_text(obj, v ? v : "");
         JS_FreeCString(ctx, v);
     }
+    /* ── Spinner: spinTime (ms per revolution). Arc length is a fixed
+     * default; lv_spinner_set_anim_params() takes both at once. */
+    else if (strcmp(key, "spinTime") == 0) {
+        const lv_obj_class_t *cls = lv_obj_get_class(obj);
+        if (cls == &lv_spinner_class) {
+            int32_t v; JS_ToInt32(ctx, &v, argv[2]);
+            if (v <= 0) v = 1000;
+            lv_spinner_set_anim_params(obj, (uint32_t)v, SG_SPINNER_ARC_ANGLE);
+        }
+    }
 
     JS_FreeCString(ctx, key);
     return JS_UNDEFINED;
@@ -615,10 +654,21 @@ static JSValue js_loadFont(JSContext *ctx, JSValueConst this_val,
             uint8_t *buf = lv_malloc((size_t)len);
             if (buf && fread(buf, 1, (size_t)len, f) == (size_t)len) {
                 lv_font_t *font = lv_tiny_ttf_create_data(buf, (size_t)len, size);
-                if (font)
+                if (font) {
+                    /* CJK TTF files have no glyphs for LVGL's built-in icon
+                     * symbols (LV_SYMBOL_OK/DOWN/… live in the 0xF000+ private
+                     * use area, supplied only by Montserrat). Fall back to the
+                     * nearest enabled Montserrat so checkbox ticks, dropdown
+                     * arrows, etc. render instead of showing tofu boxes. */
+                    const lv_font_t *fb = &lv_font_montserrat_14;
+                    if      (size >= 24) fb = &lv_font_montserrat_24;
+                    else if (size >= 20) fb = &lv_font_montserrat_20;
+                    else if (size >= 16) fb = &lv_font_montserrat_16;
+                    font->fallback = fb;
                     result = obj_to_js(ctx, (lv_obj_t *)font);
-                else
+                } else {
                     lv_free(buf);
+                }
             } else if (buf) {
                 lv_free(buf);
             }

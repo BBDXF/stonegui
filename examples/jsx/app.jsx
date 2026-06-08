@@ -106,7 +106,8 @@ function App() {
                 flexFlow: "column",
             }}
         >
-            <text style={{ textColor: "#cdd6f4", font: fontTitle }}>
+            {/* textColor: "white" — 颜色名称 */}
+            <text style={{ textColor: "white", font: fontTitle }}>
                 JSX 演示 / Demo
             </text>
 
@@ -114,13 +115,16 @@ function App() {
 
             {/* Counter */}
             <Row>
-                <Stat color="#a6e3a1" label="计数" value={count} />
-                <PillButton color="#89b4fa" onClick={() => setCount((c) => c + 1)}>
+                {/* "#a6e3a1cc" — #rrggbbaa，约 80% 不透明 */}
+                <Stat color="#a6e3a1cc" label="计数" value={count} />
+                {/* "blue" — 颜色名称 */}
+                <PillButton color="blue" onClick={() => {setCount((c) => c + 1); setProgress((c) => c + 1);}}>
                     加一
                 </PillButton>
                 <view style={{ width: 12 }} />
-                <PillButton color="#f38ba8"
-                            onClick={() => { setCount(0); setProgress(20); }}>
+                {/* "pink" — 颜色名称 */}
+                <PillButton color="pink"
+                            onClick={() => { setCount(0); setProgress(0); }}>
                     重置
                 </PillButton>
             </Row>
@@ -129,12 +133,14 @@ function App() {
 
             {/* Progress */}
             <Row>
-                <Stat color="#cba6f7" label="进度"
+                {/* "#cba6f7aa" — #rrggbbaa，约 67% 不透明 */}
+                <Stat color="#cba6f7aa" label="进度"
                       value={() => `${progress()}%`} width={200} />
                 <progress style={{ flexGrow: 1, height: 24, borderRadius: 12 }}
                           min={0} max={100} value={() => progress()} />
                 <view style={{ width: 12 }} />
-                <PillButton color="#a6e3a1" width={110}
+                {/* "lime" — 颜色名称 */}
+                <PillButton color="lime" width={110}
                             onClick={() => setProgress((p) => Math.min(100, p + 10))}>
                     +10%
                 </PillButton>
@@ -144,7 +150,8 @@ function App() {
 
             {/* Slider — onChange receives the slider's value */}
             <Row height={48}>
-                <Stat color="#fab387" label="音量"
+                {/* "orange" — 颜色名称 */}
+                <Stat color="orange" label="音量"
                       value={() => `${volume()}`} width={200} />
                 <slider style={{ flexGrow: 1, height: 10 }}
                         min={0} max={100} value={() => volume()}
@@ -155,7 +162,8 @@ function App() {
 
             {/* Switch */}
             <Row height={48}>
-                <Stat color="#f9e2af" label="开关"
+                {/* "#f9e2af80" — #rrggbbaa，约 50% 不透明 */}
+                <Stat color="#f9e2af30" label="开关"
                       value={() => (on() ? "开" : "关")} width={200} />
                 <switch checked={() => on()} onChange={(v) => setOn(v)} />
             </Row>
@@ -164,8 +172,9 @@ function App() {
 
             {/* Checkbox + Dropdown + Spinner */}
             <Row height={56}>
+                {/* textColor: "silver" — 颜色名称 */}
                 <checkbox text="同意条款"
-                          style={{ textColor: "#cdd6f4", width: 200 }}
+                          style={{ textColor: "silver", width: 200 }}
                           checked={() => agree()}
                           onChange={(v) => setAgree(v)} />
                 <dropdown style={{ width: 160 }}
@@ -173,7 +182,8 @@ function App() {
                           value={() => fruit()}
                           onChange={(i) => setFruit(i)} />
                 <view style={{ width: 16 }} />
-                <text style={{ textColor: "#bac2de", width: 120, height: 32 }}>
+                {/* textColor: "#bac2dedd" — #rrggbbaa，约 87% 不透明 */}
+                <text style={{ textColor: "#bac2dedd", width: 120, height: 32 }}>
                     {() => `选择: ${FRUITS[fruit()]}`}
                 </text>
                 <spinner style={{ width: 36, height: 36 }} />
@@ -183,12 +193,13 @@ function App() {
 
             {/* List rendering with .map() wrapped in a Fragment */}
             <>
-                <text style={{ textColor: "#94e2d5", width: "100%", height: 32 }}>
+                {/* textColor: "cyan" — 颜色名称 */}
+                <text style={{ textColor: "cyan", width: "100%", height: 32 }}>
                     技术栈 / Stack:
                 </text>
                 <Row height={40}>
                     {FEATURES.map((name) => (
-                        <text style={{ textColor: "#bac2de", width: 130, height: 32 }}>
+                        <text style={{ textColor: "gray", width: 130, height: 32 }}>
                             {`• ${name}`}
                         </text>
                     ))}

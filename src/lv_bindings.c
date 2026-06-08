@@ -77,12 +77,66 @@ static JSValue obj_to_js(JSContext *ctx, lv_obj_t *obj) {
     return JS_NewInt64(ctx, (int64_t)(uintptr_t)obj);
 }
 
-/* colour string "#rrggbb" → lv_color_t */
+/* colour string → { lv_color_t, lv_opa_t }
+ *   "#rrggbb"       — opaque
+ *   "#rrggbbaa"     — with alpha (00=transparent, ff=opaque)
+ *   named colours   — black white red green blue yellow cyan magenta
+ *                     orange purple pink gray/grey silver lime maroon
+ *                     navy olive teal transparent
+ */
+typedef struct { lv_color_t color; lv_opa_t opa; } sg_color_t;
+
+static sg_color_t parse_color_ex(const char *s) {
+    sg_color_t out = { lv_color_black(), LV_OPA_COVER };
+    if (!s) return out;
+
+    if (s[0] == '#') {
+        unsigned int r = 0, g = 0, b = 0, a = 255;
+        size_t len = strlen(s + 1);
+        if (len >= 8)
+            sscanf(s + 1, "%02x%02x%02x%02x", &r, &g, &b, &a);
+        else
+            sscanf(s + 1, "%02x%02x%02x", &r, &g, &b);
+        out.color = lv_color_make(r, g, b);
+        out.opa   = (lv_opa_t)a;
+        return out;
+    }
+
+    static const struct { const char *name; uint8_t r, g, b; lv_opa_t opa; } table[] = {
+        { "transparent", 0,   0,   0,   LV_OPA_TRANSP },
+        { "black",       0,   0,   0,   LV_OPA_COVER  },
+        { "white",       255, 255, 255, LV_OPA_COVER  },
+        { "red",         255, 0,   0,   LV_OPA_COVER  },
+        { "green",       0,   128, 0,   LV_OPA_COVER  },
+        { "blue",        0,   0,   255, LV_OPA_COVER  },
+        { "yellow",      255, 255, 0,   LV_OPA_COVER  },
+        { "cyan",        0,   255, 255, LV_OPA_COVER  },
+        { "magenta",     255, 0,   255, LV_OPA_COVER  },
+        { "orange",      255, 165, 0,   LV_OPA_COVER  },
+        { "purple",      128, 0,   128, LV_OPA_COVER  },
+        { "pink",        255, 192, 203, LV_OPA_COVER  },
+        { "gray",        128, 128, 128, LV_OPA_COVER  },
+        { "grey",        128, 128, 128, LV_OPA_COVER  },
+        { "silver",      192, 192, 192, LV_OPA_COVER  },
+        { "lime",        0,   255, 0,   LV_OPA_COVER  },
+        { "maroon",      128, 0,   0,   LV_OPA_COVER  },
+        { "navy",        0,   0,   128, LV_OPA_COVER  },
+        { "olive",       128, 128, 0,   LV_OPA_COVER  },
+        { "teal",        0,   128, 128, LV_OPA_COVER  },
+    };
+    for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
+        if (strcmp(s, table[i].name) == 0) {
+            out.color = lv_color_make(table[i].r, table[i].g, table[i].b);
+            out.opa   = table[i].opa;
+            return out;
+        }
+    }
+    return out;
+}
+
+/* Convenience wrapper — colour only (alpha ignored) */
 static lv_color_t parse_color(const char *s) {
-    if (!s || s[0] != '#') return lv_color_black();
-    unsigned int r = 0, g = 0, b = 0;
-    sscanf(s + 1, "%02x%02x%02x", &r, &g, &b);
-    return lv_color_make(r, g, b);
+    return parse_color_ex(s).color;
 }
 
 /* size value: number → px; string "NN%" → lv_pct(NN); "fill"/"100%" → 100% */
@@ -167,6 +221,19 @@ static void lv_event_free(lv_event_t *e) {
  * behaves like a React-Native View: a transparent, borderless, zero-padding
  * layout box. User styles (backgroundColor, borderRadius, padding…) layer on
  * top of this clean slate. */
+
+/* Extra drawing margin (px) a layout container reserves around itself so child
+ * decorations that spill past the box (e.g. a slider/arc knob at the track's
+ * ends) are not clipped. LV_OBJ_FLAG_OVERFLOW_VISIBLE only lifts the clip up to
+ * the parent's own ext_draw_size, so a plain (ext_draw_size == 0) container
+ * would still clip — we must contribute a non-zero size here. */
+#define SG_CONTAINER_EXT_DRAW 16
+
+static void sg_container_ext_draw_cb(lv_event_t *e) {
+    /* lv_event_set_ext_draw_size() already keeps the running maximum. */
+    lv_event_set_ext_draw_size(e, SG_CONTAINER_EXT_DRAW);
+}
+
 static void make_clean_container(lv_obj_t *obj) {
     lv_obj_set_style_bg_opa(obj, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(obj, 0, 0);
@@ -176,6 +243,19 @@ static void make_clean_container(lv_obj_t *obj) {
     lv_obj_set_style_pad_row(obj, 0, 0);
     lv_obj_set_style_pad_column(obj, 0, 0);
     lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    /* Behave like CSS `overflow: visible` (the default for flex boxes): let
+     * child decorations that extend past the box draw outside it instead of
+     * being clipped. Without this, a slider/arc knob (which is larger than the
+     * track and sits at the track's ends/edges) gets cut off at the start
+     * position and along the top/bottom.
+     *
+     * The flag alone is not enough: LVGL only widens a child's clip area by the
+     * *parent's* ext_draw_size, which is 0 for a plain transparent container.
+     * So we also reserve a small ext_draw_size via the event below. */
+    lv_obj_add_flag(obj, LV_OBJ_FLAG_OVERFLOW_VISIBLE);
+    lv_obj_add_event_cb(obj, sg_container_ext_draw_cb,
+                        LV_EVENT_REFR_EXT_DRAW_SIZE, NULL);
+    lv_obj_refresh_ext_draw_size(obj);
 }
 
 /* ── module functions ───────────────────────────────────────────────────── */
@@ -324,8 +404,9 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
     /* ── background ── */
     else if (strcmp(key, "backgroundColor") == 0) {
         const char *v = JS_ToCString(ctx, argv[2]);
-        lv_obj_set_style_bg_color(obj, parse_color(v), 0);
-        lv_obj_set_style_bg_opa(obj, LV_OPA_COVER, 0);
+        sg_color_t c = parse_color_ex(v);
+        lv_obj_set_style_bg_color(obj, c.color, 0);
+        lv_obj_set_style_bg_opa(obj, c.opa, 0);
         JS_FreeCString(ctx, v);
     }
     /* ── border / radius ── */
@@ -337,7 +418,9 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
         lv_obj_set_style_border_width(obj, v, 0);
     } else if (strcmp(key, "borderColor") == 0) {
         const char *v = JS_ToCString(ctx, argv[2]);
-        lv_obj_set_style_border_color(obj, parse_color(v), 0);
+        sg_color_t c = parse_color_ex(v);
+        lv_obj_set_style_border_color(obj, c.color, 0);
+        lv_obj_set_style_border_opa(obj, c.opa, 0);
         JS_FreeCString(ctx, v);
     }
     /* ── text / label ── */
@@ -356,7 +439,9 @@ static JSValue js_setProperty(JSContext *ctx, JSValueConst this_val,
         JS_FreeCString(ctx, v);
     } else if (strcmp(key, "textColor") == 0) {
         const char *v = JS_ToCString(ctx, argv[2]);
-        lv_obj_set_style_text_color(obj, parse_color(v), 0);
+        sg_color_t c = parse_color_ex(v);
+        lv_obj_set_style_text_color(obj, c.color, 0);
+        lv_obj_set_style_text_opa(obj, c.opa, 0);
         JS_FreeCString(ctx, v);
     } else if (strcmp(key, "fontSize") == 0) {
         int32_t v; JS_ToInt32(ctx, &v, argv[2]);

@@ -57,15 +57,18 @@ function App() {
         flexFlow: "column"
       }
     },
-    /* @__PURE__ */ h("text", { style: { textColor: "#cdd6f4", font: fontTitle } }, "JSX \u6F14\u793A / Demo"),
+    /* @__PURE__ */ h("text", { style: { textColor: "white", font: fontTitle } }, "JSX \u6F14\u793A / Demo"),
     /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
-    /* @__PURE__ */ h(Row, null, /* @__PURE__ */ h(Stat, { color: "#a6e3a1", label: "\u8BA1\u6570", value: count }), /* @__PURE__ */ h(PillButton, { color: "#89b4fa", onClick: () => setCount((c) => c + 1) }, "\u52A0\u4E00"), /* @__PURE__ */ h("view", { style: { width: 12 } }), /* @__PURE__ */ h(
+    /* @__PURE__ */ h(Row, null, /* @__PURE__ */ h(Stat, { color: "#a6e3a1cc", label: "\u8BA1\u6570", value: count }), /* @__PURE__ */ h(PillButton, { color: "blue", onClick: () => {
+      setCount((c) => c + 1);
+      setProgress((c) => c + 1);
+    } }, "\u52A0\u4E00"), /* @__PURE__ */ h("view", { style: { width: 12 } }), /* @__PURE__ */ h(
       PillButton,
       {
-        color: "#f38ba8",
+        color: "pink",
         onClick: () => {
           setCount(0);
-          setProgress(20);
+          setProgress(0);
         }
       },
       "\u91CD\u7F6E"
@@ -74,7 +77,7 @@ function App() {
     /* @__PURE__ */ h(Row, null, /* @__PURE__ */ h(
       Stat,
       {
-        color: "#cba6f7",
+        color: "#cba6f7aa",
         label: "\u8FDB\u5EA6",
         value: () => `${progress()}%`,
         width: 200
@@ -90,7 +93,7 @@ function App() {
     ), /* @__PURE__ */ h("view", { style: { width: 12 } }), /* @__PURE__ */ h(
       PillButton,
       {
-        color: "#a6e3a1",
+        color: "lime",
         width: 110,
         onClick: () => setProgress((p) => Math.min(100, p + 10))
       },
@@ -100,7 +103,7 @@ function App() {
     /* @__PURE__ */ h(Row, { height: 48 }, /* @__PURE__ */ h(
       Stat,
       {
-        color: "#fab387",
+        color: "orange",
         label: "\u97F3\u91CF",
         value: () => `${volume()}`,
         width: 200
@@ -119,7 +122,7 @@ function App() {
     /* @__PURE__ */ h(Row, { height: 48 }, /* @__PURE__ */ h(
       Stat,
       {
-        color: "#f9e2af",
+        color: "#f9e2af30",
         label: "\u5F00\u5173",
         value: () => on() ? "\u5F00" : "\u5173",
         width: 200
@@ -130,7 +133,7 @@ function App() {
       "checkbox",
       {
         text: "\u540C\u610F\u6761\u6B3E",
-        style: { textColor: "#cdd6f4", width: 200 },
+        style: { textColor: "silver", width: 200 },
         checked: () => agree(),
         onChange: (v) => setAgree(v)
       }
@@ -142,9 +145,9 @@ function App() {
         value: () => fruit(),
         onChange: (i) => setFruit(i)
       }
-    ), /* @__PURE__ */ h("view", { style: { width: 16 } }), /* @__PURE__ */ h("text", { style: { textColor: "#bac2de", width: 120, height: 32 } }, () => `\u9009\u62E9: ${FRUITS[fruit()]}`), /* @__PURE__ */ h("spinner", { style: { width: 36, height: 36 } })),
+    ), /* @__PURE__ */ h("view", { style: { width: 16 } }), /* @__PURE__ */ h("text", { style: { textColor: "#bac2dedd", width: 120, height: 32 } }, () => `\u9009\u62E9: ${FRUITS[fruit()]}`), /* @__PURE__ */ h("spinner", { style: { width: 36, height: 36 } })),
     /* @__PURE__ */ h("view", { style: { height: 12, width: "100%" } }),
-    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("text", { style: { textColor: "#94e2d5", width: "100%", height: 32 } }, "\u6280\u672F\u6808 / Stack:"), /* @__PURE__ */ h(Row, { height: 40 }, FEATURES.map((name) => /* @__PURE__ */ h("text", { style: { textColor: "#bac2de", width: 130, height: 32 } }, `\u2022 ${name}`))))
+    /* @__PURE__ */ h(Fragment, null, /* @__PURE__ */ h("text", { style: { textColor: "cyan", width: "100%", height: 32 } }, "\u6280\u672F\u6808 / Stack:"), /* @__PURE__ */ h(Row, { height: 40 }, FEATURES.map((name) => /* @__PURE__ */ h("text", { style: { textColor: "gray", width: 130, height: 32 } }, `\u2022 ${name}`))))
   );
 }
 render(() => /* @__PURE__ */ h(App, null));
